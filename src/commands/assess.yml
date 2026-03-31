@@ -1,0 +1,99 @@
+description: >
+  Call the Monte Carlo CI Gate to assess data pipeline risk for a pull request.
+  Polls for a PR agent assessment, applies the gate policy, and reports the verdict.
+
+parameters:
+  api-url:
+    type: string
+    default: "https://api.getmontecarlo.com/ci/assess"
+    description: Monte Carlo CI Gate API URL.
+  poll-interval:
+    type: integer
+    default: 30
+    description: Seconds between poll attempts when waiting for PR agent assessment.
+  max-wait:
+    type: integer
+    default: 300
+    description: Maximum seconds to wait for PR agent assessment before giving up.
+  fail-on-error:
+    type: boolean
+    default: true
+    description: Whether to fail the step if the gate returns "fail".
+
+steps:
+  - run:
+      name: MC Safety Gate
+      no_output_timeout: 6m
+      environment:
+        MC_API_URL: << parameters.api-url >>
+        POLL_INTERVAL: << parameters.poll-interval >>
+        MAX_WAIT: << parameters.max-wait >>
+        FAIL_ON_ERROR: << parameters.fail-on-error >>
+      command: |
+        if [ -z "$CIRCLE_PULL_REQUEST" ]; then
+          echo "Not a pull request build. Skipping safety gate."
+          exit 0
+        fi
+
+        PR_NUMBER=$(echo "$CIRCLE_PULL_REQUEST" | grep -oE '[0-9]+$')
+        REPO="${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
+
+        echo "PR #${PR_NUMBER} on ${REPO} at commit ${CIRCLE_SHA1}"
+        echo "Waiting ${POLL_INTERVAL}s for PR agent assessment..."
+        sleep ${POLL_INTERVAL}
+        WAITED=${POLL_INTERVAL}
+
+        while true; do
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${MC_API_URL}" \
+            -H "x-mcd-id: ${MCD_DEFAULT_API_ID}" \
+            -H "x-mcd-token: ${MCD_DEFAULT_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "$REPO" \
+              --argjson pr "$PR_NUMBER" \
+              --arg sha "$CIRCLE_SHA1" \
+              '{repository:$repo, pr_number:$pr, commit_sha:$sha}'
+            )")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "error"')
+
+          # If we got a real verdict (not "none"), we're done
+          if [ "$SOURCE" != "none" ]; then
+            break
+          fi
+
+          WAITED=$((WAITED + POLL_INTERVAL))
+          if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+            echo "No PR agent assessment found after ${MAX_WAIT}s. Giving up."
+            break
+          fi
+
+          echo "No assessment yet (${WAITED}s elapsed). Retrying in ${POLL_INTERVAL}s..."
+          sleep ${POLL_INTERVAL}
+        done
+
+        echo "--- MC Safety Gate Result ---"
+        echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+        echo "HTTP status: ${HTTP_CODE}"
+
+        CONCLUSION=$(echo "$BODY" | jq -r '.conclusion // "error"')
+        RISK_TIER=$(echo "$BODY" | jq -r '.risk_tier // "none"')
+        SUMMARY=$(echo "$BODY" | jq -r '.summary // ""')
+
+        echo ""
+        echo "Conclusion: ${CONCLUSION}"
+        echo "Risk tier:  ${RISK_TIER}"
+        echo "Source:     ${SOURCE}"
+        echo "Summary:    ${SUMMARY}"
+
+        if [ "$HTTP_CODE" -ge 400 ]; then
+          echo "WARNING: CI Gate API returned HTTP ${HTTP_CODE}"
+        fi
+
+        if [ "$CONCLUSION" = "fail" ] && [ "$FAIL_ON_ERROR" = "true" ]; then
+          echo "ERROR: MC Safety Gate failed. Add 'mc-override' label to bypass."
+          exit 1
+        fi

@@ -1,0 +1,11 @@
+version: 2.1
+
+description: >
+  Monte Carlo CI Gate — assess data pipeline risk before merge.
+  Calls the Monte Carlo CI Gate API to evaluate pull request changes against
+  your data observability signals (alerts, lineage, monitor coverage) and
+  returns a pass/warn/fail verdict.
+
+display:
+  home_url: https://www.montecarlodata.com
+  source_url: https://github.com/monte-carlo-data/mcd-ci-gate-orb

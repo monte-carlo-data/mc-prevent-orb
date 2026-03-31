@@ -1,0 +1,21 @@
+description: >
+  Basic usage of the Monte Carlo CI Gate orb.
+  Add the job to your workflow to assess data pipeline risk on pull requests.
+
+usage:
+  version: 2.1
+
+  orbs:
+    mc-gate: monte-carlo/mcd-ci-gate@1.0.0
+
+  workflows:
+    main:
+      jobs:
+        - mc-gate/assess:
+            context:
+              - monte-carlo  # Must contain MCD_DEFAULT_API_ID and MCD_DEFAULT_API_TOKEN
+            filters:
+              branches:
+                ignore:
+                  - main
+                  - master

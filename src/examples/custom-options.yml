@@ -1,0 +1,23 @@
+description: >
+  Customized usage with non-default polling and fail behavior.
+
+usage:
+  version: 2.1
+
+  orbs:
+    mc-gate: monte-carlo/mcd-ci-gate@1.0.0
+
+  workflows:
+    main:
+      jobs:
+        - mc-gate/assess:
+            api-url: "https://api.dev.getmontecarlo.com/ci/assess"
+            poll-interval: 15
+            max-wait: 120
+            fail-on-error: false
+            context:
+              - monte-carlo
+            filters:
+              branches:
+                ignore:
+                  - main

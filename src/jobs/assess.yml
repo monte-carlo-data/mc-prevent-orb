@@ -1,0 +1,30 @@
+description: >
+  Run the Monte Carlo CI Safety Gate as a standalone job.
+  Assesses data pipeline risk for the current pull request.
+
+executor: default
+
+parameters:
+  api-url:
+    type: string
+    default: "https://api.getmontecarlo.com/ci/assess"
+    description: Monte Carlo CI Gate API URL.
+  poll-interval:
+    type: integer
+    default: 30
+    description: Seconds between poll attempts when waiting for PR agent assessment.
+  max-wait:
+    type: integer
+    default: 300
+    description: Maximum seconds to wait for PR agent assessment before giving up.
+  fail-on-error:
+    type: boolean
+    default: true
+    description: Whether to fail the job if the gate returns "fail".
+
+steps:
+  - assess:
+      api-url: << parameters.api-url >>
+      poll-interval: << parameters.poll-interval >>
+      max-wait: << parameters.max-wait >>
+      fail-on-error: << parameters.fail-on-error >>
