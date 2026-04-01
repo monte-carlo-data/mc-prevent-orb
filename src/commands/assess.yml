@@ -49,7 +49,7 @@ steps:
         WAITED=${POLL_INTERVAL}
 
         while true; do
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${MC_API_URL}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 25 -X POST "${MC_API_URL}" \
             -H "x-mcd-id: ${MCD_DEFAULT_API_ID}" \
             -H "x-mcd-token: ${MCD_DEFAULT_API_TOKEN}" \
             -H "Content-Type: application/json" \
@@ -58,15 +58,22 @@ steps:
               --argjson pr "$PR_NUMBER" \
               --arg sha "$CIRCLE_SHA1" \
               '{repository:$repo, pr_number:$pr, commit_sha:$sha}'
-            )")
+            )" 2>/dev/null) || true
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
-          SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "error"')
+          # Validate response is JSON before parsing
+          if ! echo "$BODY" | jq . > /dev/null 2>&1; then
+            echo "WARNING: Non-JSON response (HTTP ${HTTP_CODE}). Retrying..."
+            BODY=""
+            SOURCE="error"
+          else
+            SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "error"')
+          fi
 
           # Got a real verdict — save to cache and use it
-          if [ "$SOURCE" != "none" ]; then
+          if [ "$SOURCE" != "none" ] && [ "$SOURCE" != "error" ]; then
             echo "$BODY" > "$CACHE_FILE"
             break
           fi
@@ -94,9 +101,9 @@ steps:
         echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
         echo "HTTP status: ${HTTP_CODE}"
 
-        CONCLUSION=$(echo "$BODY" | jq -r '.conclusion // "error"')
-        RISK_TIER=$(echo "$BODY" | jq -r '.risk_tier // "none"')
-        SUMMARY=$(echo "$BODY" | jq -r '.summary // ""')
+        CONCLUSION=$(echo "$BODY" | jq -r '.conclusion // "error"' 2>/dev/null || echo "error")
+        RISK_TIER=$(echo "$BODY" | jq -r '.risk_tier // "none"' 2>/dev/null || echo "none")
+        SUMMARY=$(echo "$BODY" | jq -r '.summary // ""' 2>/dev/null || echo "")
 
         echo ""
         echo "Conclusion: ${CONCLUSION}"
