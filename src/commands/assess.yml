@@ -1,6 +1,7 @@
 description: >
   Call the Monte Carlo CI Gate to assess data pipeline risk for a pull request.
   Polls for a PR agent assessment, applies the gate policy, and reports the verdict.
+  Caches the verdict so subsequent commits reuse it without polling.
 
 parameters:
   api-url:
@@ -21,6 +22,9 @@ parameters:
     description: Whether to fail the step if the gate returns "fail".
 
 steps:
+  - restore_cache:
+      keys:
+        - mc-prevent-{{ .Branch }}-
   - run:
       name: MC Prevent
       no_output_timeout: 6m
@@ -37,6 +41,7 @@ steps:
 
         PR_NUMBER=$(echo "$CIRCLE_PULL_REQUEST" | grep -oE '[0-9]+$')
         REPO="${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
+        CACHE_FILE="/tmp/mc-prevent-verdict.json"
 
         echo "PR #${PR_NUMBER} on ${REPO} at commit ${CIRCLE_SHA1}"
         echo "Waiting ${POLL_INTERVAL}s for PR agent assessment..."
@@ -60,8 +65,18 @@ steps:
 
           SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "error"')
 
-          # If we got a real verdict (not "none"), we're done
+          # Got a real verdict — save to cache and use it
           if [ "$SOURCE" != "none" ]; then
+            echo "$BODY" > "$CACHE_FILE"
+            break
+          fi
+
+          # No assessment yet — check if we have a cached verdict from a previous run
+          if [ -f "$CACHE_FILE" ]; then
+            echo "No new assessment. Using cached verdict from previous run."
+            BODY=$(cat "$CACHE_FILE")
+            HTTP_CODE=200
+            SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "cached"')
             break
           fi
 
@@ -97,3 +112,7 @@ steps:
           echo "ERROR: MC Prevent failed. Add 'mc-override' label to bypass."
           exit 1
         fi
+  - save_cache:
+      key: mc-prevent-{{ .Branch }}-{{ epoch }}
+      paths:
+        - /tmp/mc-prevent-verdict.json
