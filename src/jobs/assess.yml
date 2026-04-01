@@ -1,5 +1,5 @@
 description: >
-  Run the Monte Carlo CI Safety Gate as a standalone job.
+  Run Monte Carlo's MC Prevent as a standalone job.
   Assesses data pipeline risk for the current pull request.
 
 executor: default

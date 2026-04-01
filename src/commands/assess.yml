@@ -22,7 +22,7 @@ parameters:
 
 steps:
   - run:
-      name: MC Safety Gate
+      name: MC Prevent
       no_output_timeout: 6m
       environment:
         MC_API_URL: << parameters.api-url >>
@@ -31,7 +31,7 @@ steps:
         FAIL_ON_ERROR: << parameters.fail-on-error >>
       command: |
         if [ -z "$CIRCLE_PULL_REQUEST" ]; then
-          echo "Not a pull request build. Skipping safety gate."
+          echo "Not a pull request build. Skipping MC Prevent."
           exit 0
         fi
 
@@ -75,7 +75,7 @@ steps:
           sleep ${POLL_INTERVAL}
         done
 
-        echo "--- MC Safety Gate Result ---"
+        echo "--- MC Prevent Result ---"
         echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
         echo "HTTP status: ${HTTP_CODE}"
 
@@ -94,6 +94,6 @@ steps:
         fi
 
         if [ "$CONCLUSION" = "fail" ] && [ "$FAIL_ON_ERROR" = "true" ]; then
-          echo "ERROR: MC Safety Gate failed. Add 'mc-override' label to bypass."
+          echo "ERROR: MC Prevent failed. Add 'mc-override' label to bypass."
           exit 1
         fi
