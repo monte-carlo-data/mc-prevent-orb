@@ -8,7 +8,7 @@ Assess data pipeline risk before merge. This orb calls the Monte Carlo MC Preven
 version: 2.1
 
 orbs:
-  mc-prevent: monte-carlo/mc-prevent@1.0.0
+  mc-prevent: monte-carlo/mc-prevent-orb@1.0.0
 
 workflows:
   main:
