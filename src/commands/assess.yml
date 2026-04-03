@@ -1,5 +1,5 @@
 description: >
-  Call the Monte Carlo CI Gate to assess data pipeline risk for a pull request.
+  Call the Monte Carlo MC Prevent API to assess data pipeline risk for a pull request.
   Polls for a PR agent assessment, applies the gate policy, and reports the verdict.
   Caches the verdict so subsequent commits reuse it without polling.
 
@@ -7,7 +7,7 @@ parameters:
   api-url:
     type: string
     default: "https://api.getmontecarlo.com/ci/assess"
-    description: Monte Carlo CI Gate API URL.
+    description: Monte Carlo MC Prevent API URL.
   poll-interval:
     type: integer
     default: 30
@@ -19,7 +19,7 @@ parameters:
   fail-on-error:
     type: boolean
     default: true
-    description: Whether to fail the step if the gate returns "fail".
+    description: Whether to fail the job if the gate returns "fail".
 
 steps:
   - restore_cache:
@@ -44,7 +44,7 @@ steps:
         CACHE_FILE="/tmp/mc-prevent-verdict.json"
 
         echo "PR #${PR_NUMBER} on ${REPO} at commit ${CIRCLE_SHA1}"
-        echo "Waiting ${POLL_INTERVAL}s for PR agent assessment..."
+        echo "Retrieving MC Prevent assessment..."
         sleep ${POLL_INTERVAL}
         WAITED=${POLL_INTERVAL}
 
@@ -63,9 +63,7 @@ steps:
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
 
-          # Validate response is JSON before parsing
           if ! echo "$BODY" | jq . > /dev/null 2>&1; then
-            echo "WARNING: Non-JSON response (HTTP ${HTTP_CODE}). Retrying..."
             BODY=""
             SOURCE="error"
           else
@@ -80,7 +78,7 @@ steps:
 
           # No assessment yet — check if we have a cached verdict from a previous run
           if [ -f "$CACHE_FILE" ]; then
-            echo "No new assessment. Using cached verdict from previous run."
+            echo "Using cached assessment from previous run."
             BODY=$(cat "$CACHE_FILE")
             HTTP_CODE=200
             SOURCE=$(echo "$BODY" | jq -r '.assessment_source // "cached"')
@@ -89,36 +87,58 @@ steps:
 
           WAITED=$((WAITED + POLL_INTERVAL))
           if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-            echo "No PR agent assessment found after ${MAX_WAIT}s. Giving up."
+            echo "No assessment available. Defaulting to pass."
             break
           fi
 
-          echo "No assessment yet (${WAITED}s elapsed). Retrying in ${POLL_INTERVAL}s..."
           sleep ${POLL_INTERVAL}
         done
 
-        echo "--- MC Prevent Result ---"
-        echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
-        echo "HTTP status: ${HTTP_CODE}"
+        # Save raw response for the detail step
+        echo "$BODY" > /tmp/mc-prevent-raw-response.json
 
+        # Parse result
         CONCLUSION=$(echo "$BODY" | jq -r '.conclusion // "error"' 2>/dev/null || echo "error")
         RISK_TIER=$(echo "$BODY" | jq -r '.risk_tier // "none"' 2>/dev/null || echo "none")
+        HUMAN_SUMMARY=$(echo "$BODY" | jq -r '.human_summary // ""' 2>/dev/null || echo "")
         SUMMARY=$(echo "$BODY" | jq -r '.summary // ""' 2>/dev/null || echo "")
+        DISPLAY_SUMMARY="${HUMAN_SUMMARY:-$SUMMARY}"
+        # Strip markdown for plain text output
+        PLAIN_SUMMARY=$(echo "$DISPLAY_SUMMARY" | sed 's/\*\*//g; s/\*//g; s/`//g')
 
+        echo ""
+        echo "==========================================="
+        echo " MC Prevent CI Check Result"
+        echo "==========================================="
         echo ""
         echo "Conclusion: ${CONCLUSION}"
         echo "Risk tier:  ${RISK_TIER}"
-        echo "Source:     ${SOURCE}"
-        echo "Summary:    ${SUMMARY}"
+        echo ""
+        echo "${PLAIN_SUMMARY}"
+        echo ""
+        echo "==========================================="
 
-        if [ "$HTTP_CODE" -ge 400 ]; then
-          echo "WARNING: CI Gate API returned HTTP ${HTTP_CODE}"
+        # Persist conclusion for fail check
+        echo "export MC_PREVENT_CONCLUSION=${CONCLUSION}" >> "$BASH_ENV"
+
+  - run:
+      name: Raw API response (click to expand)
+      command: |
+        if [ -f /tmp/mc-prevent-raw-response.json ]; then
+          cat /tmp/mc-prevent-raw-response.json | jq . 2>/dev/null || cat /tmp/mc-prevent-raw-response.json
+        else
+          echo "No response available."
         fi
 
-        if [ "$CONCLUSION" = "fail" ] && [ "$FAIL_ON_ERROR" = "true" ]; then
-          echo "ERROR: MC Prevent failed. Add 'mc-override' label to bypass."
+  - run:
+      name: MC Prevent gate check
+      command: |
+        FAIL_ON_ERROR="${FAIL_ON_ERROR:-true}"
+        if [ "$MC_PREVENT_CONCLUSION" = "fail" ] && [ "$FAIL_ON_ERROR" = "true" ]; then
+          echo "MC Prevent failed. Add 'mc-override' label to bypass."
           exit 1
         fi
+
   - save_cache:
       key: mc-prevent-{{ .Branch }}-{{ epoch }}
       paths:

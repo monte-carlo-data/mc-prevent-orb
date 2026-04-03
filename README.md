@@ -69,7 +69,9 @@ That's it. MC Prevent will run on every pull request and report a pass/warn/fail
 2. Calls the Monte Carlo MC Prevent API with the repo, PR number, and commit SHA
 3. If no assessment is available yet (the PR agent may still be analyzing), waits up to `max-wait` seconds
 4. If a cached verdict from a previous commit exists, reuses it immediately
-5. Reports the verdict: **pass**, **warn**, or **fail**
+5. Displays the verdict and a human-readable summary explaining the risk
+6. Raw API response available in a separate collapsed step ("Raw API response")
+7. Optionally fails the job if the verdict is "fail" (controlled by `fail-on-error`)
 
 ### Verdicts
 
