@@ -1,6 +1,6 @@
 description: >
-  Call the Monte Carlo MC Prevent API to assess data pipeline risk for a pull request.
-  Polls for a PR agent assessment, applies the gate policy, and reports the verdict.
+  Run MC Prevent to assess data pipeline risk for a pull request.
+  Polls for the PR agent assessment, applies the gate policy, and reports a verdict.
   Caches the verdict so subsequent commits reuse it without polling.
 
 parameters:
@@ -19,14 +19,19 @@ parameters:
   fail-on-error:
     type: boolean
     default: true
-    description: Whether to fail the job if the gate returns "fail".
+    description: >
+      Whether warn and fail verdicts cause the CI job to exit non-zero.
+      When true (default), warn and fail both show as red in CI, drawing attention.
+      When false, the CI job always passes — the verdict is only visible in the job output.
+      The "MC Prevent CI Gate Result" check run on the PR always shows the real verdict
+      regardless of this setting.
 
 steps:
   - restore_cache:
       keys:
         - mc-prevent-{{ .Branch }}-
   - run:
-      name: MC Prevent
+      name: "\u26a0\ufe0f MC Prevent"
       no_output_timeout: 6m
       environment:
         MC_API_URL: << parameters.api-url >>
@@ -36,6 +41,11 @@ steps:
       command: |
         if [ -z "$CIRCLE_PULL_REQUEST" ]; then
           echo "Not a pull request build. Skipping MC Prevent."
+          exit 0
+        fi
+
+        if [ -z "${MCD_DEFAULT_API_ID}" ] || [ -z "${MCD_DEFAULT_API_TOKEN}" ]; then
+          echo "MC Prevent: MCD_DEFAULT_API_ID/MCD_DEFAULT_API_TOKEN not configured. Skipping."
           exit 0
         fi
 
@@ -118,11 +128,22 @@ steps:
         echo ""
         echo "==========================================="
 
-        # Persist conclusion for fail check
-        echo "export MC_PREVENT_CONCLUSION=${CONCLUSION}" >> "$BASH_ENV"
+        # Exit 1 on warn or fail so this step auto-expands in CircleCI UI
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          if [ "$CONCLUSION" = "fail" ] || [ "$CONCLUSION" = "warn" ]; then
+            echo ""
+            if [ "$CONCLUSION" = "fail" ]; then
+              echo "MC Prevent: FAIL. Add 'mc-override' label to bypass."
+            else
+              echo "MC Prevent: WARNING. Review the assessment before merging."
+            fi
+            exit 1
+          fi
+        fi
 
   - run:
       name: Raw API response (click to expand)
+      when: always
       command: |
         if [ -f /tmp/mc-prevent-raw-response.json ]; then
           cat /tmp/mc-prevent-raw-response.json | jq . 2>/dev/null || cat /tmp/mc-prevent-raw-response.json
@@ -130,16 +151,8 @@ steps:
           echo "No response available."
         fi
 
-  - run:
-      name: MC Prevent gate check
-      command: |
-        FAIL_ON_ERROR="${FAIL_ON_ERROR:-true}"
-        if [ "$MC_PREVENT_CONCLUSION" = "fail" ] && [ "$FAIL_ON_ERROR" = "true" ]; then
-          echo "MC Prevent failed. Add 'mc-override' label to bypass."
-          exit 1
-        fi
-
   - save_cache:
+      when: always
       key: mc-prevent-{{ .Branch }}-{{ epoch }}
       paths:
         - /tmp/mc-prevent-verdict.json

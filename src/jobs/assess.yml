@@ -20,7 +20,7 @@ parameters:
   fail-on-error:
     type: boolean
     default: true
-    description: Whether to fail the job if the gate returns "fail".
+    description: Whether warn/fail verdicts cause the CI job to exit non-zero.
 
 steps:
   - assess:
