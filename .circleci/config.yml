@@ -24,8 +24,8 @@ workflows:
             branches:
               ignore: /.*/
       - orb-tools/publish:
-          orb-name: monte-carlo/mc-prevent-orb
-          vcs-type: << pipeline.project.type >>
+          orb_name: monte-carlo/mc-prevent-orb
+          vcs_type: << pipeline.project.type >>
           requires:
             - orb-tools/lint
             - orb-tools/pack
