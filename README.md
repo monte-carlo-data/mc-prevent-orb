@@ -116,5 +116,5 @@ Check the step output — if the verdict is `warn` (not `fail`), this is expecte
 ## Resources
 
 - [Monte Carlo Documentation](https://docs.getmontecarlo.com)
-- [MC Prevent Overview](https://docs.getmontecarlo.com/docs/copy-of-github)
+- [MC Prevent Overview](https://docs.getmontecarlo.com/docs/github)
 - [Source Code](https://github.com/monte-carlo-data/mc-prevent-orb)
