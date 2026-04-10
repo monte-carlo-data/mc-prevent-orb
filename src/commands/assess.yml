@@ -156,7 +156,8 @@ steps:
         echo ""
         echo "==========================="
 
-        if [ "$FAIL_ON_ERROR" = "true" ]; then
+        if [ "$FAIL_ON_ERROR" != "false" ] \
+          && [ "$FAIL_ON_ERROR" != "0" ]; then
           if [ "$CL" = "fail" ] \
             || [ "$CL" = "warn" ]; then
             echo ""
