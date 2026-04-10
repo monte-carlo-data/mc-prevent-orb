@@ -1,0 +1,35 @@
+---
+description: >
+  Run MC Prevent as a standalone job.
+  Assesses data pipeline risk for the
+  current pull request.
+
+executor: default
+
+parameters:
+  api-url:
+    type: string
+    default: >-
+      https://api.getmontecarlo.com/ci/assess
+    description: MC Prevent API URL.
+  poll-interval:
+    type: integer
+    default: 30
+    description: Seconds between poll attempts.
+  max-wait:
+    type: integer
+    default: 300
+    description: Max seconds to wait.
+  fail-on-error:
+    type: boolean
+    default: true
+    description: >
+      Whether warn/fail verdicts cause the
+      CI job to exit non-zero.
+
+steps:
+  - assess:
+      api-url: << parameters.api-url >>
+      poll-interval: << parameters.poll-interval >>
+      max-wait: << parameters.max-wait >>
+      fail-on-error: << parameters.fail-on-error >>

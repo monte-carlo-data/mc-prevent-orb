@@ -1,0 +1,10 @@
+version: 2.1
+
+orbs:
+  orb-tools: circleci/orb-tools@12.1
+
+workflows:
+  validate:
+    jobs:
+      - orb-tools/lint
+      - orb-tools/pack

@@ -1,0 +1,4 @@
+---
+description: Default executor for MC Prevent.
+docker:
+  - image: cimg/base:current

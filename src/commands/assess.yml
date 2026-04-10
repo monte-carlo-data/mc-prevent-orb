@@ -1,0 +1,187 @@
+---
+description: >
+  Run MC Prevent to assess data pipeline
+  risk for a pull request. Polls for the
+  PR agent assessment, applies the gate
+  policy, and reports a verdict. Caches
+  the verdict so subsequent commits reuse
+  it without polling.
+
+parameters:
+  api-url:
+    type: string
+    default: >-
+      https://api.getmontecarlo.com/ci/assess
+    description: >
+      Monte Carlo MC Prevent API URL.
+  poll-interval:
+    type: integer
+    default: 30
+    description: >
+      Seconds between poll attempts when
+      waiting for PR agent assessment.
+  max-wait:
+    type: integer
+    default: 300
+    description: >
+      Maximum seconds to wait for PR agent
+      assessment before giving up.
+  fail-on-error:
+    type: boolean
+    default: true
+    description: >
+      Whether warn and fail verdicts cause
+      the CI job to exit non-zero.
+
+steps:
+  - restore_cache:
+      keys:
+        - mc-prevent-{{ .Branch }}-
+  - run:
+      name: MC Prevent
+      no_output_timeout: 6m
+      environment:
+        MC_API_URL: << parameters.api-url >>
+        POLL_INTERVAL: << parameters.poll-interval >>
+        MAX_WAIT: << parameters.max-wait >>
+        FAIL_ON_ERROR: << parameters.fail-on-error >>
+      command: |
+        if [ -z "$CIRCLE_PULL_REQUEST" ]; then
+          echo "Not a PR build. Skipping."
+          exit 0
+        fi
+
+        MCD_ID="${MCD_DEFAULT_API_ID}"
+        MCD_TK="${MCD_DEFAULT_API_TOKEN}"
+        if [ -z "$MCD_ID" ] || [ -z "$MCD_TK" ]; then
+          echo "Credentials not configured."
+          exit 0
+        fi
+
+        PR=$(echo "$CIRCLE_PULL_REQUEST" \
+          | grep -oE '[0-9]+$')
+        OWN="${CIRCLE_PROJECT_USERNAME}"
+        RNM="${CIRCLE_PROJECT_REPONAME}"
+        REPO="${OWN}/${RNM}"
+        CF="/tmp/mc-prevent-verdict.json"
+
+        echo "PR #${PR} on ${REPO}"
+        echo "Retrieving assessment..."
+        sleep "$POLL_INTERVAL"
+        WAITED="$POLL_INTERVAL"
+
+        while true; do
+          RESP=$(curl -s -w "\n%{http_code}" \
+            --max-time 25 \
+            -X POST "${MC_API_URL}" \
+            -H "x-mcd-id: ${MCD_ID}" \
+            -H "x-mcd-token: ${MCD_TK}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg r "$REPO" \
+              --argjson p "$PR" \
+              --arg s "$CIRCLE_SHA1" \
+              '{
+                repository: $r,
+                pr_number: $p,
+                commit_sha: $s
+              }')" 2>/dev/null) || true
+
+          HC=$(echo "$RESP" | tail -1)
+          BD=$(echo "$RESP" | sed '$d')
+
+          if ! echo "$BD" \
+            | jq . >/dev/null 2>&1; then
+            BD=""
+            SRC="error"
+          else
+            SRC=$(echo "$BD" \
+              | jq -r \
+                '.assessment_source // "error"')
+          fi
+
+          if [ "$SRC" != "none" ] \
+            && [ "$SRC" != "error" ]; then
+            echo "$BD" > "$CF"
+            break
+          fi
+
+          if [ -f "$CF" ]; then
+            echo "Using cached assessment."
+            BD=$(cat "$CF")
+            HC=200
+            SRC=$(echo "$BD" \
+              | jq -r \
+                '.assessment_source // "cached"')
+            break
+          fi
+
+          WAITED=$((WAITED + POLL_INTERVAL))
+          if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+            echo "No assessment available."
+            break
+          fi
+
+          sleep "$POLL_INTERVAL"
+        done
+
+        echo "$BD" \
+          > /tmp/mc-prevent-raw-response.json
+
+        CL=$(echo "$BD" | jq -r \
+          '.conclusion // "error"' \
+          2>/dev/null || echo "error")
+        RT=$(echo "$BD" | jq -r \
+          '.risk_tier // "none"' \
+          2>/dev/null || echo "none")
+        HS=$(echo "$BD" | jq -r \
+          '.human_summary // ""' \
+          2>/dev/null || echo "")
+        SM=$(echo "$BD" | jq -r \
+          '.summary // ""' \
+          2>/dev/null || echo "")
+        DS="${HS:-$SM}"
+        PS=$(echo "$DS" \
+          | sed 's/\*\*//g; s/\*//g; s/`//g')
+
+        echo ""
+        echo "==========================="
+        echo " MC Prevent CI Check Result"
+        echo "==========================="
+        echo ""
+        echo "Conclusion: ${CL}"
+        echo "Risk tier:  ${RT}"
+        echo ""
+        echo "${PS}"
+        echo ""
+        echo "==========================="
+
+        if [ "$FAIL_ON_ERROR" = "true" ]; then
+          if [ "$CL" = "fail" ] \
+            || [ "$CL" = "warn" ]; then
+            echo ""
+            if [ "$CL" = "fail" ]; then
+              echo "FAIL. Add mc-override."
+            else
+              echo "WARNING. Review first."
+            fi
+            exit 1
+          fi
+        fi
+
+  - run:
+      name: Raw response (click to expand)
+      when: always
+      command: |
+        F=/tmp/mc-prevent-raw-response.json
+        if [ -f "$F" ]; then
+          jq . "$F" 2>/dev/null || cat "$F"
+        else
+          echo "No response available."
+        fi
+
+  - save_cache:
+      when: always
+      key: mc-prevent-{{ .Branch }}-{{ epoch }}
+      paths:
+        - /tmp/mc-prevent-verdict.json

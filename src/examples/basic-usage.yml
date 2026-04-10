@@ -1,0 +1,22 @@
+---
+description: >
+  Basic usage. MC Prevent runs on every
+  PR and warns/fails on risky changes.
+
+usage:
+  version: 2.1
+
+  orbs:
+    mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/main/orb.yml
+
+  workflows:
+    main:
+      jobs:
+        - mc-prevent/assess:
+            context:
+              - monte-carlo
+            filters:
+              branches:
+                ignore:
+                  - main
+                  - master

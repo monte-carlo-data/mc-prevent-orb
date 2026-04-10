@@ -1,0 +1,25 @@
+---
+description: >
+  Non-blocking setup. CI always passes,
+  verdict visible in output and check
+  run only.
+
+usage:
+  version: 2.1
+
+  orbs:
+    mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/main/orb.yml
+
+  workflows:
+    main:
+      jobs:
+        - mc-prevent/assess:
+            poll-interval: 15
+            max-wait: 120
+            fail-on-error: false
+            context:
+              - monte-carlo
+            filters:
+              branches:
+                ignore:
+                  - main
