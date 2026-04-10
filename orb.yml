@@ -162,7 +162,7 @@ commands:
                     MAX_WAIT: << parameters.max-wait >>
                     MC_API_URL: << parameters.api-url >>
                     POLL_INTERVAL: << parameters.poll-interval >>
-                name: MC Prevent
+                name: ⚠️ MC Prevent
                 no_output_timeout: 6m
             - run:
                 command: |
@@ -172,7 +172,7 @@ commands:
                     else
                       echo "No response available."
                     fi
-                name: Raw response (click to expand)
+                name: Raw API response (click to expand)
                 when: always
             - save_cache:
                 key: mc-prevent-{{ .Branch }}-{{ epoch }}

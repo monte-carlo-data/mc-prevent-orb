@@ -38,7 +38,7 @@ steps:
       keys:
         - mc-prevent-{{ .Branch }}-
   - run:
-      name: MC Prevent
+      name: "\u26a0\ufe0f MC Prevent"
       no_output_timeout: 6m
       environment:
         MC_API_URL: << parameters.api-url >>
@@ -170,7 +170,7 @@ steps:
         fi
 
   - run:
-      name: Raw response (click to expand)
+      name: Raw API response (click to expand)
       when: always
       command: |
         F=/tmp/mc-prevent-raw-response.json
