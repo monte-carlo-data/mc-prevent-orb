@@ -233,6 +233,7 @@ examples:
                                     ignore:
                                         - main
                                         - master
+                            name: mc-prevent
     custom-options:
         description: |
             Non-blocking setup. CI always passes, verdict visible in output and check run only.
@@ -252,5 +253,6 @@ examples:
                                     ignore:
                                         - main
                             max-wait: 120
+                            name: mc-prevent
                             poll-interval: 15
 

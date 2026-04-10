@@ -18,18 +18,7 @@ Your CircleCI organization admin must allow the orb URL prefix before any projec
    - **Auth:** `None`
 4. Click **Add URL Prefix**
 
-Or via the API:
-
-```bash
-curl -X POST "https://circleci.com/api/private/organization/${ORG_ID}/url-orb-allow-list" \
-  --header "Circle-Token: ${CIRCLE_TOKEN}" \
-  --header "Content-Type: application/json" \
-  --data '{
-    "name": "Monte Carlo MC Prevent",
-    "prefix": "https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/",
-    "auth": "none"
-  }'
-```
+The allow-list can also be managed via the [CircleCI API](https://circleci.com/docs/orbs/use/managing-url-orbs-allow-lists/).
 
 ### 2. Create Monte Carlo API keys
 
@@ -56,6 +45,7 @@ workflows:
   main:
     jobs:
       - mc-prevent/assess:
+          name: mc-prevent
           context:
             - monte-carlo
           filters:
@@ -69,14 +59,17 @@ That's it. MC Prevent runs on every pull request and reports a verdict.
 
 ## Versioning
 
-URL orbs use Git-based versioning instead of semantic versioning. Choose a reference strategy:
+URL orbs do not use semantic versioning. The URL can point to any git ref — a branch, tag, or commit SHA:
 
 ```yaml
 # Track latest on main (recommended — picks up improvements automatically)
 mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/main/orb.yml
 
-# Pin to a specific release tag (for strict reproducibility)
-mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/v1.0.0/orb.yml
+# Pin to a release tag
+mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/v1.0/orb.yml
+
+# Pin to a specific commit (immutable)
+mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<commit-sha>/orb.yml
 ```
 
 > **Note:** CircleCI caches URL orb contents for 5 minutes. After a release, pipelines pick up the update within that window.
@@ -94,6 +87,7 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/v1
 
 ```yaml
 - mc-prevent/assess:
+    name: mc-prevent
     poll-interval: 15
     max-wait: 120
     fail-on-error: false
@@ -163,7 +157,7 @@ MC Prevent is designed for progressive adoption. Once the allow-list is configur
 
 | Setup stage | CI result | What you'll see |
 |---|---|---|
-| Orb referenced, URL not allow-listed | Config error (pipeline won't start) | CircleCI rejects the config with an "orb not allowed" error. The org admin must add the URL prefix to the allow-list first — see [Step 1](#1-allow-list-the-orb-one-time-org-admin). |
+| Orb referenced, URL not allow-listed | Pipeline will not run | The org admin must add the URL prefix to the allow-list first — see [Step 1](#1-allow-list-the-orb-one-time-org-admin). |
 | Allow-list configured, credentials not yet set | Pass (green) | Job skips instantly — no API call is made |
 | Credentials configured, PR agent not yet enabled | Pass (green) | Job polls for up to `max-wait` seconds, then passes with no assessment |
 | Credentials configured, PR agent enabled | Pass / Warn / Fail | Full risk verdict based on the PR agent's analysis |
@@ -181,7 +175,7 @@ Add the `mc-override` label to your pull request to bypass MC Prevent.
 ## Troubleshooting
 
 **MC Prevent times out with no assessment:**
-The PR agent posts its assessment when a PR is opened or marked ready for review. If you push additional commits, MC Prevent reuses the cached verdict from the initial assessment. If no assessment exists after `max-wait` seconds, the job passes without blocking. This typically means the PR agent is not yet enabled — see the [setup stages](#behavior-by-setup-stage) table above.
+MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analysis to become available. The PR agent runs independently and may take longer depending on the number of affected assets and downstream dependencies. If no assessment is ready within the wait window, the job passes without blocking — this ensures MC Prevent never holds up your CI pipeline. On subsequent commits, MC Prevent reuses the cached verdict from the initial assessment so there is no repeated wait. If you consistently see timeouts, verify that the PR agent is enabled in **Monte Carlo → Settings → AI Agents** — see the [setup stages](#behavior-by-setup-stage) table above.
 
 **Authentication errors (401):**
 Verify that `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set correctly in your CircleCI context. Ensure the context is referenced in your workflow job.
@@ -189,8 +183,8 @@ Verify that `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set correctly i
 **CI job shows red but the change is low risk:**
 Check the step output — if the verdict is `warn` (not `fail`), this is expected when `fail-on-error: true`. The check run on the PR will show grey (neutral), not red. Set `fail-on-error: false` if you don't want warnings to fail the CI job.
 
-**"Orb not allowed" or URL orb config error:**
-This is a config-level failure — the pipeline won't start at all, not just the MC Prevent job. Your CircleCI organization admin needs to add the URL prefix to the allow-list before any project can reference the orb. See [Step 1](#1-allow-list-the-orb-one-time-org-admin) above.
+**"Orb not allowed" or URL orb error:**
+Your CircleCI organization admin needs to add the URL prefix to the allow-list before any project can reference the orb. See [Step 1](#1-allow-list-the-orb-one-time-org-admin) above.
 
 ## Development
 

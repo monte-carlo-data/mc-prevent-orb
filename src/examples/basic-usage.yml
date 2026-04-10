@@ -13,6 +13,7 @@ usage:
     main:
       jobs:
         - mc-prevent/assess:
+            name: mc-prevent
             context:
               - monte-carlo
             filters:
