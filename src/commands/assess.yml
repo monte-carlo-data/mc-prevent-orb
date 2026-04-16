@@ -30,8 +30,37 @@ parameters:
     type: boolean
     default: true
     description: >
-      Whether warn and fail verdicts cause
-      the CI job to exit non-zero.
+      Deprecated — use fail-on instead.
+      true = fail-on: warn_and_fail.
+      false = fail-on: none.
+  fail-on:
+    type: enum
+    enum:
+      - "warn_and_fail"
+      - "fail_only"
+      - "none"
+    default: "warn_and_fail"
+    description: >
+      Which verdicts cause the job to exit
+      non-zero. warn_and_fail (default):
+      both warn and fail. fail_only: only
+      fail. none: always passes.
+  exempt-tables:
+    type: string
+    default: ""
+    description: >
+      Comma-separated table names to
+      exclude from gate evaluation.
+  min-risk-tier:
+    type: enum
+    enum:
+      - "low"
+      - "medium"
+      - "high"
+    default: "low"
+    description: >
+      Minimum risk tier to act on. PRs
+      below this tier pass automatically.
 
 steps:
   - restore_cache:
@@ -45,6 +74,9 @@ steps:
         POLL_INTERVAL: << parameters.poll-interval >>
         MAX_WAIT: << parameters.max-wait >>
         FAIL_ON_ERROR: << parameters.fail-on-error >>
+        FAIL_ON: << parameters.fail-on >>
+        EXEMPT_TABLES: << parameters.exempt-tables >>
+        MIN_RISK_TIER: << parameters.min-risk-tier >>
       command: |
         if [ -z "$CIRCLE_PULL_REQUEST" ]; then
           echo "Not a PR build. Skipping."
@@ -81,11 +113,22 @@ steps:
               --arg r "$REPO" \
               --argjson p "$PR" \
               --arg s "$CIRCLE_SHA1" \
+              --arg exempt "$EXEMPT_TABLES" \
+              --arg min_tier "$MIN_RISK_TIER" \
               '{
                 repository: $r,
                 pr_number: $p,
                 commit_sha: $s
-              }')" 2>/dev/null) || true
+              }
+              | if $exempt != "" then
+                  . + {exempt_tables: ($exempt
+                    | split(",")
+                    | map(gsub("^\\s+|\\s+$"; "")))}
+                else . end
+              | if $min_tier != "low"
+                  and $min_tier != ""
+                then . + {min_risk_tier: $min_tier}
+                else . end')" 2>/dev/null) || true
 
           HC=$(echo "$RESP" | tail -1)
           BD=$(echo "$RESP" | sed '$d')
@@ -156,8 +199,16 @@ steps:
         echo ""
         echo "==========================="
 
-        if [ "$FAIL_ON_ERROR" != "false" ] \
-          && [ "$FAIL_ON_ERROR" != "0" ]; then
+        # Resolve effective fail-on mode.
+        EFF="$FAIL_ON"
+        if [ "$EFF" = "warn_and_fail" ]; then
+          if [ "$FAIL_ON_ERROR" = "false" ] \
+            || [ "$FAIL_ON_ERROR" = "0" ]; then
+            EFF="none"
+          fi
+        fi
+
+        if [ "$EFF" = "warn_and_fail" ]; then
           if [ "$CL" = "fail" ] \
             || [ "$CL" = "warn" ]; then
             echo ""
@@ -166,6 +217,12 @@ steps:
             else
               echo "WARNING. Review first."
             fi
+            exit 1
+          fi
+        elif [ "$EFF" = "fail_only" ]; then
+          if [ "$CL" = "fail" ]; then
+            echo ""
+            echo "FAIL. Add mc-override."
             exit 1
           fi
         fi
