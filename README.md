@@ -79,18 +79,40 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `api-url` | string | `https://api.getmontecarlo.com/ci/assess` | Monte Carlo MC Prevent API URL |
+| `fail-on` | enum | `warn_and_fail` | Which verdicts exit non-zero: `warn_and_fail`, `fail_only`, or `none` |
+| `exempt-tables` | string | — | Comma-separated table names to exclude from evaluation |
+| `min-risk-tier` | enum | `low` | Minimum risk tier to act on: `low`, `medium`, or `high` |
 | `poll-interval` | integer | `30` | Seconds between poll attempts when waiting for assessment |
 | `max-wait` | integer | `300` | Maximum seconds to wait for assessment before giving up |
-| `fail-on-error` | boolean | `true` | Whether warn/fail verdicts cause the CI job to exit non-zero |
 
-### Example with custom parameters
+> **Migrating from `fail-on-error`:** `fail-on-error: true` is equivalent to `fail-on: warn_and_fail` (the default). `fail-on-error: false` is equivalent to `fail-on: none`. The `fail-on-error` parameter still works for backward compatibility.
+
+### Example: only block on fail, not warnings
 
 ```yaml
 - mc-prevent/assess:
     name: mc-prevent
-    poll-interval: 15
-    max-wait: 120
-    fail-on-error: false
+    fail-on: fail_only
+    context:
+      - monte-carlo
+```
+
+### Example: exclude staging tables
+
+```yaml
+- mc-prevent/assess:
+    name: mc-prevent
+    exempt-tables: "staging.*, sandbox.scratch_table"
+    context:
+      - monte-carlo
+```
+
+### Example: only gate on medium and high risk PRs
+
+```yaml
+- mc-prevent/assess:
+    name: mc-prevent
+    min-risk-tier: medium
     context:
       - monte-carlo
 ```
@@ -108,13 +130,13 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 
 MC Prevent returns one of three verdicts based on the risk assessment:
 
-| Verdict | What it means | CI job behavior (`fail-on-error: true`) | Check run on PR |
-|---|---|---|---|
-| **pass** | No significant risk detected | Job passes (green) | Green |
-| **warn** | Risk detected — review recommended | Job fails (red), step auto-expands | Grey (neutral) |
-| **fail** | High risk — merge not recommended | Job fails (red), step auto-expands | Red |
+| Verdict | What it means | `warn_and_fail` (default) | `fail_only` | `none` | Check run on PR |
+|---|---|---|---|---|---|
+| **pass** | No significant risk detected | Green | Green | Green | Green |
+| **warn** | Risk detected — review recommended | Red | Green | Green | Grey (neutral) |
+| **fail** | High risk — merge not recommended | Red | Red | Green | Red |
 
-**Note on CI job vs check run:** The CI job can only show green or red. The "MC Prevent CI Gate Result" check run posted on the PR shows the actual severity — green for pass, grey for warn, red for fail. If you configure branch protection, require the check run (not the CI job) for accurate gating.
+**Note on CI job vs check run:** The CI job can only show green or red. The "MC Prevent CI Gate Result" check run posted on the PR shows the actual three-way severity — green for pass, grey for warn, red for fail. If you configure branch protection, require the check run (not the CI job) for accurate gating.
 
 ### How the verdict is calculated
 
@@ -124,13 +146,11 @@ MC Prevent receives a risk assessment from the MC PR Agent for each data asset a
 
 | # | Condition | Verdict |
 |---|-----------|---------|
-| 1 | Breaking change AND downstream key assets depend on it | **fail** |
+| 1 | Breaking change AND downstream assets depend on it | **fail** |
 | 2 | Active alerts highly correlated with the change | **fail** |
-| 3 | Breaking change AND no key assets downstream | **warn** |
+| 3 | Breaking change AND no downstream assets | **warn** |
 | 4 | Active alerts exist but low/no correlation with the change | **warn** |
-| 5 | No monitor coverage AND key assets downstream | **warn** |
-| 6 | Additive change, no active alerts | **pass** |
-| 7 | No qualifying data assets identified | **pass** |
+| 5 | Everything else | **pass** |
 
 **Signals used per asset** — provided by the PR agent:
 
@@ -139,17 +159,23 @@ MC Prevent receives a risk assessment from the MC PR Agent for each data asset a
 | `change_type` | How the asset is affected: `breaking` or `additive` |
 | `alert_correlation` | Whether active alerts are related to the change: `high`, `low`, or `none` |
 | `active_alerts` | Number of unresolved alerts on the asset |
-| `downstream_key_assets` | Key assets (dashboards, critical tables) that depend on this asset |
-| `monitor_coverage_gaps` | Columns or aspects of the asset that have no monitor coverage |
+| `downstream_assets` | Downstream assets (dashboards, tables) that depend on this asset |
 
 **Multi-asset PRs:** When a PR affects multiple data assets, each is evaluated independently. The final verdict is the **worst** across all assets — if one asset is `fail` and another is `pass`, the PR verdict is `fail`.
 
-### What `fail-on-error` controls
+### Understanding the verdict explanation
+
+The CI job output and the check run on the PR both include a per-asset explanation of why the verdict was reached. For each asset that triggered a warn or fail, the explanation describes the change type, downstream exposure, and what to verify. Assets that passed are summarized with their change type and downstream count.
+
+The explanation ends with a sentence justifying the overall conclusion — for example, "Because the breaking change does not affect downstream assets, the conclusion is warn." This helps you understand why a high-risk PR might get warn instead of fail, or vice versa.
+
+### What `fail-on` controls
 
 | Setting | Behavior |
 |---|---|
-| `fail-on-error: true` (default) | Warn and fail both cause the CI job to exit non-zero (red). This draws attention to risks — the failed step auto-expands in CircleCI so the summary is immediately visible. |
-| `fail-on-error: false` | The CI job always passes (green). The verdict is only visible in the job output and the check run on the PR. Use this for a silent, non-blocking setup. |
+| `warn_and_fail` (default) | Both warn and fail cause the CI job to exit non-zero (red). The failed step auto-expands in CircleCI so the summary is immediately visible. |
+| `fail_only` | Only fail exits non-zero. Warnings are visible in the job output and check run but don't break your pipeline. Good for teams that want to focus on critical issues. |
+| `none` | The CI job always passes (green). The verdict is only visible in the job output and the check run on the PR. Use this for a silent, non-blocking setup. |
 
 ### Behavior by setup stage
 
@@ -181,7 +207,7 @@ MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analy
 Verify that `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set correctly in your CircleCI context. Ensure the context is referenced in your workflow job.
 
 **CI job shows red but the change is low risk:**
-Check the step output — if the verdict is `warn` (not `fail`), this is expected when `fail-on-error: true`. The check run on the PR will show grey (neutral), not red. Set `fail-on-error: false` if you don't want warnings to fail the CI job.
+Check the step output — if the verdict is `warn` (not `fail`), this is expected when using `fail-on: warn_and_fail` (the default). The check run on the PR will show grey (neutral), not red. Set `fail-on: fail_only` to only block on fail verdicts, or `fail-on: none` if you don't want any verdict to fail the CI job.
 
 **"Orb not allowed" or URL orb error:**
 Your CircleCI organization admin needs to add the URL prefix to the allow-list before any project can reference the orb. See [Step 1](#1-allow-list-the-orb-one-time-org-admin) above.

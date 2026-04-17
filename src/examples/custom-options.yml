@@ -1,8 +1,7 @@
 ---
 description: >
-  Non-blocking setup. CI always passes,
-  verdict visible in output and check
-  run only.
+  Only block on fail verdicts. Warnings
+  show in output but don't break CI.
 
 usage:
   version: 2.1
@@ -15,9 +14,7 @@ usage:
       jobs:
         - mc-prevent/assess:
             name: mc-prevent
-            poll-interval: 15
-            max-wait: 120
-            fail-on-error: false
+            fail-on: fail_only
             context:
               - monte-carlo
             filters:
