@@ -20,18 +20,14 @@ commands:
                     Comma-separated table names to exclude from gate evaluation.
                 type: string
             fail-on:
-                default: warn_and_fail
+                default: ""
                 description: |
-                    Which verdicts cause the job to exit non-zero. warn_and_fail (default): both warn and fail. fail_only: only fail. none: always passes.
-                enum:
-                    - warn_and_fail
-                    - fail_only
-                    - none
-                type: enum
+                    Which verdicts cause the job to exit non-zero. Valid values: warn_and_fail, fail_only, none. If left unset (default), the Monte Carlo UI's fail_on setting applies instead.
+                type: string
             fail-on-error:
                 default: true
                 description: |
-                    Deprecated — use fail-on instead. true = fail-on: warn_and_fail. false = fail-on: none.
+                    Deprecated — use fail-on instead. false = fail-on: none. true is a no-op (defers to fail-on).
                 type: boolean
             max-wait:
                 default: 300
@@ -77,6 +73,17 @@ commands:
                     REPO="${OWN}/${RNM}"
                     CF="/tmp/mc-prevent-verdict.json"
 
+                    # Resolve effective fail-on before the API call. fail-on is only
+                    # sent when the user explicitly sets it — unset means "defer to
+                    # UI setting". fail-on-error is a deprecated shim: false → none.
+                    EFF="$FAIL_ON"
+                    if [ -z "$EFF" ]; then
+                      if [ "$FAIL_ON_ERROR" = "false" ] \
+                        || [ "$FAIL_ON_ERROR" = "0" ]; then
+                        EFF="none"
+                      fi
+                    fi
+
                     echo "PR #${PR} on ${REPO}"
                     echo "Retrieving assessment..."
                     sleep "$POLL_INTERVAL"
@@ -95,6 +102,7 @@ commands:
                           --arg s "$CIRCLE_SHA1" \
                           --arg exempt "$EXEMPT_TABLES" \
                           --arg min_tier "$MIN_RISK_TIER" \
+                          --arg fail_on "$EFF" \
                           '{
                             repository: $r,
                             pr_number: $p,
@@ -108,6 +116,9 @@ commands:
                           | if $min_tier != "low"
                               and $min_tier != ""
                             then . + {min_risk_tier: $min_tier}
+                            else . end
+                          | if $fail_on != "" then
+                              . + {fail_on: $fail_on}
                             else . end')" 2>/dev/null) || true
 
                       HC=$(echo "$RESP" | tail -1)
@@ -179,32 +190,16 @@ commands:
                     echo ""
                     echo "==========================="
 
-                    # Resolve effective fail-on mode.
-                    EFF="$FAIL_ON"
-                    if [ "$EFF" = "warn_and_fail" ]; then
-                      if [ "$FAIL_ON_ERROR" = "false" ] \
-                        || [ "$FAIL_ON_ERROR" = "0" ]; then
-                        EFF="none"
-                      fi
-                    fi
-
-                    if [ "$EFF" = "warn_and_fail" ]; then
-                      if [ "$CL" = "fail" ] \
-                        || [ "$CL" = "warn" ]; then
-                        echo ""
-                        if [ "$CL" = "fail" ]; then
-                          echo "FAIL. Add mc-override."
-                        else
-                          echo "WARNING. Review first."
-                        fi
-                        exit 1
-                      fi
-                    elif [ "$EFF" = "fail_only" ]; then
-                      if [ "$CL" = "fail" ]; then
-                        echo ""
-                        echo "FAIL. Add mc-override."
-                        exit 1
-                      fi
+                    # The backend has already merged CI and UI fail_on and applied
+                    # it to the verdict, so we just exit based on the final conclusion.
+                    if [ "$CL" = "fail" ]; then
+                      echo ""
+                      echo "FAIL. Add mc-override."
+                      exit 1
+                    elif [ "$CL" = "warn" ]; then
+                      echo ""
+                      echo "WARNING. Review first."
+                      exit 1
                     fi
                 environment:
                     EXEMPT_TABLES: << parameters.exempt-tables >>
