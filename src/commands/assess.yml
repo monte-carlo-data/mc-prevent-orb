@@ -52,15 +52,14 @@ parameters:
       Comma-separated table names to
       exclude from gate evaluation.
   min-risk-tier:
-    type: enum
-    enum:
-      - "low"
-      - "medium"
-      - "high"
-    default: "low"
+    type: string
+    default: ""
     description: >
-      Minimum risk tier to act on. PRs
-      below this tier pass automatically.
+      Minimum risk tier to act on.
+      Valid values: low, medium, high.
+      When left unset the Monte Carlo UI's
+      min_risk_tier setting applies.
+      Setting any value overrides the UI.
 
 steps:
   - restore_cache:
@@ -137,9 +136,8 @@ steps:
                     | split(",")
                     | map(gsub("^\\s+|\\s+$"; "")))}
                 else . end
-              | if $min_tier != "low"
-                  and $min_tier != ""
-                then . + {min_risk_tier: $min_tier}
+              | if $min_tier != "" then
+                  . + {min_risk_tier: $min_tier}
                 else . end
               | if $fail_on != "" then
                   . + {fail_on: $fail_on}

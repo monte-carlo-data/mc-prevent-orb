@@ -35,14 +35,10 @@ commands:
                     Maximum seconds to wait for PR agent assessment before giving up.
                 type: integer
             min-risk-tier:
-                default: low
+                default: ""
                 description: |
-                    Minimum risk tier to act on. PRs below this tier pass automatically.
-                enum:
-                    - low
-                    - medium
-                    - high
-                type: enum
+                    Minimum risk tier to act on. Valid values: low, medium, high. When left unset the Monte Carlo UI's min_risk_tier setting applies. Setting any value overrides the UI.
+                type: string
             poll-interval:
                 default: 30
                 description: |
@@ -113,9 +109,8 @@ commands:
                                 | split(",")
                                 | map(gsub("^\\s+|\\s+$"; "")))}
                             else . end
-                          | if $min_tier != "low"
-                              and $min_tier != ""
-                            then . + {min_risk_tier: $min_tier}
+                          | if $min_tier != "" then
+                              . + {min_risk_tier: $min_tier}
                             else . end
                           | if $fail_on != "" then
                               . + {fail_on: $fail_on}
