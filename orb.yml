@@ -22,7 +22,7 @@ commands:
             fail-on:
                 default: ""
                 description: |
-                    Which verdicts cause the job to exit non-zero. Valid values: warn_and_fail, fail_only, none. If left unset (default), the Monte Carlo UI's fail_on setting applies instead.
+                    Which verdicts cause the job to exit non-zero: warn_and_fail, fail_only, or none. When left as the empty string this parameter is not sent to the backend, and the Monte Carlo UI's fail_on setting applies. Setting any of the three values overrides the UI.
                 type: string
             fail-on-error:
                 default: true
