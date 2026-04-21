@@ -14,11 +14,6 @@ commands:
                 description: |
                     Monte Carlo MC Prevent API URL.
                 type: string
-            exempt-tables:
-                default: ""
-                description: |
-                    Comma-separated table names to exclude from gate evaluation.
-                type: string
             fail-on:
                 default: ""
                 description: |
@@ -34,11 +29,6 @@ commands:
                 description: |
                     Maximum seconds to wait for PR agent assessment before giving up.
                 type: integer
-            min-risk-tier:
-                default: ""
-                description: |
-                    Minimum risk tier to act on. Valid values: low, medium, high. When left unset the Monte Carlo UI's min_risk_tier setting applies. Setting any value overrides the UI.
-                type: string
             poll-interval:
                 default: 30
                 description: |
@@ -96,22 +86,12 @@ commands:
                           --arg r "$REPO" \
                           --argjson p "$PR" \
                           --arg s "$CIRCLE_SHA1" \
-                          --arg exempt "$EXEMPT_TABLES" \
-                          --arg min_tier "$MIN_RISK_TIER" \
                           --arg fail_on "$EFF" \
                           '{
                             repository: $r,
                             pr_number: $p,
                             commit_sha: $s
                           }
-                          | if $exempt != "" then
-                              . + {exempt_tables: ($exempt
-                                | split(",")
-                                | map(gsub("^\\s+|\\s+$"; "")))}
-                            else . end
-                          | if $min_tier != "" then
-                              . + {min_risk_tier: $min_tier}
-                            else . end
                           | if $fail_on != "" then
                               . + {fail_on: $fail_on}
                             else . end')" 2>/dev/null) || true
@@ -197,12 +177,10 @@ commands:
                       exit 1
                     fi
                 environment:
-                    EXEMPT_TABLES: << parameters.exempt-tables >>
                     FAIL_ON: << parameters.fail-on >>
                     FAIL_ON_ERROR: << parameters.fail-on-error >>
                     MAX_WAIT: << parameters.max-wait >>
                     MC_API_URL: << parameters.api-url >>
-                    MIN_RISK_TIER: << parameters.min-risk-tier >>
                     POLL_INTERVAL: << parameters.poll-interval >>
                 name: ⚠️ MC Prevent
                 no_output_timeout: 6m
@@ -236,11 +214,6 @@ jobs:
                 default: https://api.getmontecarlo.com/ci/assess
                 description: MC Prevent API URL.
                 type: string
-            exempt-tables:
-                default: ""
-                description: |
-                    Comma-separated table names to exclude from gate evaluation.
-                type: string
             fail-on:
                 default: warn_and_fail
                 description: |
@@ -259,15 +232,6 @@ jobs:
                 default: 300
                 description: Max seconds to wait.
                 type: integer
-            min-risk-tier:
-                default: low
-                description: |
-                    Minimum risk tier to act on.
-                enum:
-                    - low
-                    - medium
-                    - high
-                type: enum
             poll-interval:
                 default: 30
                 description: Seconds between poll attempts.
@@ -275,11 +239,9 @@ jobs:
         steps:
             - assess:
                 api-url: << parameters.api-url >>
-                exempt-tables: << parameters.exempt-tables >>
                 fail-on: << parameters.fail-on >>
                 fail-on-error: << parameters.fail-on-error >>
                 max-wait: << parameters.max-wait >>
-                min-risk-tier: << parameters.min-risk-tier >>
                 poll-interval: << parameters.poll-interval >>
 examples:
     basic-usage:

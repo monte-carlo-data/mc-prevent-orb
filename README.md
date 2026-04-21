@@ -80,8 +80,6 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 |---|---|---|---|
 | `api-url` | string | `https://api.getmontecarlo.com/ci/assess` | Monte Carlo MC Prevent API URL |
 | `fail-on` | enum | `warn_and_fail` | Which verdicts exit non-zero: `warn_and_fail`, `fail_only`, or `none` |
-| `exempt-tables` | string | — | Comma-separated table names to exclude from evaluation |
-| `min-risk-tier` | enum | `low` | Minimum risk tier to act on: `low`, `medium`, or `high` |
 | `poll-interval` | integer | `30` | Seconds between poll attempts when waiting for assessment |
 | `max-wait` | integer | `300` | Maximum seconds to wait for assessment before giving up |
 
@@ -93,26 +91,6 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 - mc-prevent/assess:
     name: mc-prevent
     fail-on: fail_only
-    context:
-      - monte-carlo
-```
-
-### Example: exclude staging tables
-
-```yaml
-- mc-prevent/assess:
-    name: mc-prevent
-    exempt-tables: "staging.*, sandbox.scratch_table"
-    context:
-      - monte-carlo
-```
-
-### Example: only gate on medium and high risk PRs
-
-```yaml
-- mc-prevent/assess:
-    name: mc-prevent
-    min-risk-tier: medium
     context:
       - monte-carlo
 ```

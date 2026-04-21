@@ -45,21 +45,6 @@ parameters:
       Carlo UI's fail_on setting applies.
       Setting any of the three values
       overrides the UI.
-  exempt-tables:
-    type: string
-    default: ""
-    description: >
-      Comma-separated table names to
-      exclude from gate evaluation.
-  min-risk-tier:
-    type: string
-    default: ""
-    description: >
-      Minimum risk tier to act on.
-      Valid values: low, medium, high.
-      When left unset the Monte Carlo UI's
-      min_risk_tier setting applies.
-      Setting any value overrides the UI.
 
 steps:
   - restore_cache:
@@ -74,8 +59,6 @@ steps:
         MAX_WAIT: << parameters.max-wait >>
         FAIL_ON_ERROR: << parameters.fail-on-error >>
         FAIL_ON: << parameters.fail-on >>
-        EXEMPT_TABLES: << parameters.exempt-tables >>
-        MIN_RISK_TIER: << parameters.min-risk-tier >>
       command: |
         if [ -z "$CIRCLE_PULL_REQUEST" ]; then
           echo "Not a PR build. Skipping."
@@ -123,22 +106,12 @@ steps:
               --arg r "$REPO" \
               --argjson p "$PR" \
               --arg s "$CIRCLE_SHA1" \
-              --arg exempt "$EXEMPT_TABLES" \
-              --arg min_tier "$MIN_RISK_TIER" \
               --arg fail_on "$EFF" \
               '{
                 repository: $r,
                 pr_number: $p,
                 commit_sha: $s
               }
-              | if $exempt != "" then
-                  . + {exempt_tables: ($exempt
-                    | split(",")
-                    | map(gsub("^\\s+|\\s+$"; "")))}
-                else . end
-              | if $min_tier != "" then
-                  . + {min_risk_tier: $min_tier}
-                else . end
               | if $fail_on != "" then
                   . + {fail_on: $fail_on}
                 else . end')" 2>/dev/null) || true

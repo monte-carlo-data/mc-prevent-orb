@@ -35,21 +35,6 @@ parameters:
     description: >
       Which verdicts cause the job to exit
       non-zero.
-  exempt-tables:
-    type: string
-    default: ""
-    description: >
-      Comma-separated table names to
-      exclude from gate evaluation.
-  min-risk-tier:
-    type: enum
-    enum:
-      - "low"
-      - "medium"
-      - "high"
-    default: "low"
-    description: >
-      Minimum risk tier to act on.
 
 steps:
   - assess:
@@ -58,5 +43,3 @@ steps:
       max-wait: << parameters.max-wait >>
       fail-on-error: << parameters.fail-on-error >>
       fail-on: << parameters.fail-on >>
-      exempt-tables: << parameters.exempt-tables >>
-      min-risk-tier: << parameters.min-risk-tier >>
