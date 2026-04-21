@@ -215,14 +215,10 @@ jobs:
                 description: MC Prevent API URL.
                 type: string
             fail-on:
-                default: warn_and_fail
+                default: ""
                 description: |
-                    Which verdicts cause the job to exit non-zero.
-                enum:
-                    - warn_and_fail
-                    - fail_only
-                    - none
-                type: enum
+                    Which verdicts cause the job to exit non-zero: warn_and_fail, fail_only, or none. When left unset the Monte Carlo UI's fail_on setting applies.
+                type: string
             fail-on-error:
                 default: true
                 description: |

@@ -26,15 +26,13 @@ parameters:
     description: >
       Deprecated — use fail-on instead.
   fail-on:
-    type: enum
-    enum:
-      - "warn_and_fail"
-      - "fail_only"
-      - "none"
-    default: "warn_and_fail"
+    type: string
+    default: ""
     description: >
       Which verdicts cause the job to exit
-      non-zero.
+      non-zero: warn_and_fail, fail_only,
+      or none. When left unset the Monte
+      Carlo UI's fail_on setting applies.
 
 steps:
   - assess:
