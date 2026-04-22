@@ -77,7 +77,7 @@ commands:
 
                     while true; do
                       RESP=$(curl -s -w "\n%{http_code}" \
-                        --max-time 25 \
+                        --max-time 45 \
                         -X POST "${MC_API_URL}" \
                         -H "x-mcd-id: ${MCD_ID}" \
                         -H "x-mcd-token: ${MCD_TK}" \
