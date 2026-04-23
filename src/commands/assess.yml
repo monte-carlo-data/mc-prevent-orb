@@ -4,8 +4,8 @@ description: >
   risk for a pull request. Polls for the
   PR agent assessment, applies the gate
   policy, and reports a verdict. Caches
-  the verdict so subsequent commits reuse
-  it without polling.
+  the verdict per commit so CI re-runs
+  reuse it without polling.
 
 parameters:
   api-url:
@@ -49,7 +49,7 @@ parameters:
 steps:
   - restore_cache:
       keys:
-        - mc-prevent-{{ .Branch }}-
+        - mc-prevent-{{ .Revision }}-
   - run:
       name: "\u26a0\ufe0f MC Prevent"
       no_output_timeout: 6m
@@ -210,6 +210,6 @@ steps:
 
   - save_cache:
       when: always
-      key: mc-prevent-{{ .Branch }}-{{ epoch }}
+      key: mc-prevent-{{ .Revision }}-{{ epoch }}
       paths:
         - /tmp/mc-prevent-verdict.json

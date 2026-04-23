@@ -100,7 +100,7 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 1. MC Prevent detects the pull request from CircleCI environment variables
 2. Calls the Monte Carlo MC Prevent API with the repo, PR number, and commit SHA
 3. If no assessment is available yet (the PR agent may still be analyzing), waits up to `max-wait` seconds
-4. If a cached verdict from a previous commit exists, reuses it immediately
+4. If the same commit was assessed in a previous CI run, reuses the cached verdict immediately
 5. Displays the verdict and a human-readable summary explaining the risk
 6. Raw API response available in a separate collapsed step ("Raw API response")
 
@@ -179,7 +179,7 @@ Add the `mc-override` label to your pull request to bypass MC Prevent.
 ## Troubleshooting
 
 **MC Prevent times out with no assessment:**
-MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analysis to become available. The PR agent runs independently and may take longer depending on the number of affected assets and downstream dependencies. If no assessment is ready within the wait window, the job passes without blocking — this ensures MC Prevent never holds up your CI pipeline. On subsequent commits, MC Prevent reuses the cached verdict from the initial assessment so there is no repeated wait. If you consistently see timeouts, verify that the PR agent is enabled in **Monte Carlo → Settings → AI Agents** — see the [setup stages](#behavior-by-setup-stage) table above.
+MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analysis to become available. The PR agent runs independently and may take longer depending on the number of affected assets and downstream dependencies. If no assessment is ready within the wait window, the job passes without blocking — this ensures MC Prevent never holds up your CI pipeline. Each commit is assessed independently — cached verdicts are scoped to the commit SHA and are not reused across commits. To trigger a fresh assessment on a new commit, comment `mc review` on the PR. If you consistently see timeouts, verify that the PR agent is enabled in **Monte Carlo → Settings → AI Agents** — see the [setup stages](#behavior-by-setup-stage) table above.
 
 **Authentication errors (401):**
 Verify that `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set correctly in your CircleCI context. Ensure the context is referenced in your workflow job.

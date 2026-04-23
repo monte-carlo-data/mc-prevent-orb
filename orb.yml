@@ -7,7 +7,7 @@ display:
 commands:
     assess:
         description: |
-            Run MC Prevent to assess data pipeline risk for a pull request. Polls for the PR agent assessment, applies the gate policy, and reports a verdict. Caches the verdict so subsequent commits reuse it without polling.
+            Run MC Prevent to assess data pipeline risk for a pull request. Polls for the PR agent assessment, applies the gate policy, and reports a verdict. Caches the verdict per commit so CI re-runs reuse it without polling.
         parameters:
             api-url:
                 default: https://api.getmontecarlo.com/ci/assess
@@ -37,7 +37,7 @@ commands:
         steps:
             - restore_cache:
                 keys:
-                    - mc-prevent-{{ .Branch }}-
+                    - mc-prevent-{{ .Revision }}-
             - run:
                 command: |
                     if [ -z "$CIRCLE_PULL_REQUEST" ]; then
@@ -195,7 +195,7 @@ commands:
                 name: Raw API response (click to expand)
                 when: always
             - save_cache:
-                key: mc-prevent-{{ .Branch }}-{{ epoch }}
+                key: mc-prevent-{{ .Revision }}-{{ epoch }}
                 paths:
                     - /tmp/mc-prevent-verdict.json
                 when: always
