@@ -57,7 +57,7 @@ parameters:
 steps:
   - restore_cache:
       keys:
-        - mc-prevent-{{ .Revision }}-
+        - mc-prevent-{{ .Branch }}-
   - run:
       name: "\u26a0\ufe0f MC Prevent"
       no_output_timeout: 6m
@@ -224,6 +224,6 @@ steps:
 
   - save_cache:
       when: always
-      key: mc-prevent-{{ .Revision }}-{{ epoch }}
+      key: mc-prevent-{{ .Branch }}-{{ epoch }}
       paths:
         - /tmp/mc-prevent-verdict.json

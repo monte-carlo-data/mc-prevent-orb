@@ -42,7 +42,7 @@ commands:
         steps:
             - restore_cache:
                 keys:
-                    - mc-prevent-{{ .Revision }}-
+                    - mc-prevent-{{ .Branch }}-
             - run:
                 command: |
                     if [ -z "$CIRCLE_PULL_REQUEST" ]; then
@@ -206,7 +206,7 @@ commands:
                 name: Raw API response (click to expand)
                 when: always
             - save_cache:
-                key: mc-prevent-{{ .Revision }}-{{ epoch }}
+                key: mc-prevent-{{ .Branch }}-{{ epoch }}
                 paths:
                     - /tmp/mc-prevent-verdict.json
                 when: always
