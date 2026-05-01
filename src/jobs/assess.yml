@@ -24,15 +24,20 @@ parameters:
     type: boolean
     default: true
     description: >
-      Deprecated — use fail-on instead.
+      Deprecated — use block-on instead.
+  block-on:
+    type: string
+    default: ""
+    description: >
+      Which risk tiers cause the job to exit
+      non-zero: low+, medium+, high+, or
+      none. When left unset the Monte Carlo
+      UI setting applies.
   fail-on:
     type: string
     default: ""
     description: >
-      Which verdicts cause the job to exit
-      non-zero: warn_and_fail, fail_only,
-      or none. When left unset the Monte
-      Carlo UI's fail_on setting applies.
+      Deprecated — use block-on instead.
 
 steps:
   - assess:
@@ -40,4 +45,5 @@ steps:
       poll-interval: << parameters.poll-interval >>
       max-wait: << parameters.max-wait >>
       fail-on-error: << parameters.fail-on-error >>
+      block-on: << parameters.block-on >>
       fail-on: << parameters.fail-on >>

@@ -1,7 +1,7 @@
 ---
 description: >
-  Only block on fail verdicts. Warnings
-  show in output but don't break CI.
+  Only block on high-risk PRs. Medium and
+  low risk show in output but don't block.
 
 usage:
   version: 2.1
@@ -14,7 +14,7 @@ usage:
       jobs:
         - mc-prevent/assess:
             name: mc-prevent
-            fail-on: fail_only
+            block-on: high+
             context:
               - monte-carlo
             filters:
