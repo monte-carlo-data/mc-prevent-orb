@@ -82,9 +82,6 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 | `block-on`      | string  | _(UI setting)_                            | Which risk tiers exit non-zero: `low+`, `medium+`, `high+`, or `none`. When unset, the Monte Carlo UI's setting applies. |
 | `poll-interval` | integer | `30`                                      | Seconds between poll attempts when waiting for assessment                                                                |
 | `max-wait`      | integer | `300`                                     | Maximum seconds to wait for assessment before giving up                                                                  |
-
-> **Migrating from `fail-on`:** `fail-on` is deprecated but still works for backward compatibility. `block-on` takes precedence when both are set. Mapping: `warn_and_fail` → `medium+`, `fail_only` → `high+`, `none` → `none`.
-
 ### Example: only block on high-risk PRs
 
 ```yaml
