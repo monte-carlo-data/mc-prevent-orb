@@ -85,8 +85,6 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 
 > **Migrating from `fail-on`:** `fail-on` is deprecated but still works for backward compatibility. `block-on` takes precedence when both are set. Mapping: `warn_and_fail` → `medium+`, `fail_only` → `high+`, `none` → `none`.
 
-> **Migrating from `fail-on-error`:** `fail-on-error: true` is equivalent to `block-on: medium+` (the default). `fail-on-error: false` is equivalent to `block-on: none`. The `fail-on-error` parameter still works for backward compatibility.
-
 ### Example: only block on high-risk PRs
 
 ```yaml
@@ -102,7 +100,7 @@ mc-prevent: https://raw.githubusercontent.com/monte-carlo-data/mc-prevent-orb/<c
 1. MC Prevent detects the pull request from CircleCI environment variables
 2. Calls the Monte Carlo MC Prevent API with the repo, PR number, and commit SHA
 3. If no assessment is available yet (the PR agent may still be analyzing), waits up to `max-wait` seconds
-4. If a cached verdict from a previous commit exists, reuses it immediately
+4. If a cached verdict from a previous run on the same commit exists, reuses it immediately
 5. Displays the verdict and a human-readable summary explaining the risk
 6. Raw API response available in a separate collapsed step ("Raw API response")
 
@@ -116,7 +114,7 @@ MC Prevent assigns a risk tier (low, medium, high) to each PR based on a rubric 
 | **medium** | Fail   | Fail      | Pass    | Pass   |
 | **high**   | Fail   | Fail      | Fail    | Pass   |
 
-**Note on CI job vs check run:** The CI job can only show green or red. The "MC Prevent CI Gate Result" check run posted on the PR shows the verdict with a detailed summary. If you configure branch protection, require the check run (not the CI job) for accurate gating.
+**Note on CI job vs check run:** The CI job can only show green or red. The "MC Prevent: CI Gate Result" check run posted on the PR shows the verdict with a detailed summary. If you configure branch protection, require the check run (not the CI job) for accurate gating.
 
 ### Behavior by setup stage
 
@@ -136,13 +134,13 @@ MC Prevent is designed for progressive adoption. Once the allow-list is configur
 Add the `mc-override` label to your pull request to bypass MC Prevent.
 
 - The verdict returns **pass** regardless of risk
-- The "MC Prevent CI Gate Result" check run on the PR immediately flips to green — no commit or CI re-run needed
+- The "MC Prevent: CI Gate Result" check run on the PR immediately flips to green — no commit or CI re-run needed
 - All overrides are logged for audit
 
 ## Troubleshooting
 
 **MC Prevent times out with no assessment:**
-MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analysis to become available. The PR agent runs independently and may take longer depending on the number of affected assets and downstream dependencies. If no assessment is ready within the wait window, the job passes without blocking — this ensures MC Prevent never holds up your CI pipeline. On subsequent commits, MC Prevent reuses the cached verdict from the initial assessment so there is no repeated wait. If you consistently see timeouts, verify that the PR agent is enabled in **Monte Carlo → Settings → AI Agents** — see the [setup stages](#behavior-by-setup-stage) table above.
+MC Prevent waits up to `max-wait` seconds (default 300) for the PR agent's analysis to become available. The PR agent runs independently and may take longer depending on the number of affected assets and downstream dependencies. If no assessment is ready within the wait window, the job passes without blocking — this ensures MC Prevent never holds up your CI pipeline. If you rerun CI on the same commit, MC Prevent reuses the cached verdict so there is no repeated wait. If you push a new commit, MC Prevent polls for a fresh assessment. If you consistently see timeouts, verify that the PR agent is enabled in **Monte Carlo → Settings → AI Agents** — see the [setup stages](#behavior-by-setup-stage) table above.
 
 **Authentication errors (401):**
 Verify that `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set correctly in your CircleCI context. Ensure the context is referenced in your workflow job.
