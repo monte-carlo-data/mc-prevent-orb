@@ -57,7 +57,8 @@ parameters:
 steps:
   - restore_cache:
       keys:
-        - mc-prevent-{{ .Branch }}-
+        - mc-prevent-{{ .Revision }}
+        - mc-prevent-
   - run:
       name: "\u26a0\ufe0f MC Prevent"
       no_output_timeout: 6m
@@ -149,6 +150,18 @@ steps:
             break
           fi
 
+          WAITED=$((WAITED + POLL_INTERVAL))
+          if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+            echo "No assessment for this commit."
+            break
+          fi
+
+          sleep "$POLL_INTERVAL"
+        done
+
+        # If polling found nothing, fall back to cached verdict
+        if [ "$SRC" = "none" ] \
+          || [ "$SRC" = "error" ]; then
           if [ -f "$CF" ]; then
             echo "Using cached assessment."
             BD=$(cat "$CF")
@@ -156,17 +169,10 @@ steps:
             SRC=$(echo "$BD" \
               | jq -r \
                 '.assessment_source // "cached"')
-            break
+          else
+            echo "No cached verdict. Passing."
           fi
-
-          WAITED=$((WAITED + POLL_INTERVAL))
-          if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-            echo "No assessment available."
-            break
-          fi
-
-          sleep "$POLL_INTERVAL"
-        done
+        fi
 
         echo "$BD" \
           > /tmp/mc-prevent-raw-response.json
@@ -224,6 +230,6 @@ steps:
 
   - save_cache:
       when: always
-      key: mc-prevent-{{ .Branch }}-{{ epoch }}
+      key: mc-prevent-{{ .Revision }}
       paths:
         - /tmp/mc-prevent-verdict.json
